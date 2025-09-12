@@ -165,7 +165,7 @@ Draw.loadPlugin(function(ui) {
         var xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
         var umlElements = [];
-        var types = ['Class', 'ActionState', 'Dependency', 'Actor', 'UseCase', 'Component','Interface','Collaborate', 'Association'];
+        var types = ['Class', 'ActionState', 'Actor', 'UseCase', 'Component','Interface','Collaborate', 'Association', 'Dependency'];
         for (var i in types) {
             umlElements = umlElements.concat(parseUmlElement(xmlDoc, types[i]));
         }
@@ -285,74 +285,20 @@ Draw.loadPlugin(function(ui) {
 
                 var entryDx = 0;
                 var entryDy = 0;
-                
-                if(item.stereotype == 'realize')
-                {
-					//Element can not be drawn before Source and Destination
-					deferredRealizeDependencies.push(item);
-                                       
-                } else if(item.stereotype == 'optional') {
+                if (item.stereotype == 'realize') {
+                    // Element can not be drawn before Source and Destination
+                    deferredRealizeDependencies.push(item);
+                } else if (item.stereotype == 'optional') {
                     /*Dependency to resources that are own by other packages than the parent of exported Diagram.*/
                 } else if (item.stereotype == 'mandatory') {
                     /*Dependency to resources that are own by other packages than the parent of exported Diagram.*/
                 } else {
-                    try{
+                    try {
                         var source = sourceVertex.geometry;
                         var target = targetVertex.geometry;
-                        var entryX, entryY, exitX, exitY;
-        
-                        if (source.x === target.x) { // Source aligned horizontally with target
-                            if (source.y < target.y) { // Source above target
-                                entryX = 0.5;
-                                entryY = 1;
-                                exitX = 0.5;
-                                exitY = 0;
-                            } else { // Source below target
-                                entryX = 0.5;
-                                entryY = 0;
-                                exitX = 0.5;
-                                exitY = 1;
-                            }
-                        } else if (source.y === target.y) { // Source aligned vertically with target
-                            if (source.x < target.x) { // Source to the left of target
-                                entryX = 1;
-                                entryY = 0.5;
-                                exitX = 0;
-                                exitY = 0.5;
-                            } else { // Source to the right of target
-                                entryX = 0;
-                                entryY = 0.5;
-                                exitX = 1;
-                                exitY = 0.5;
-                            }
-                        } else { // Source and target not aligned
-                            if (source.x < target.x) { // Source to the left of target
-                                if (source.y < target.y) { // Source above and to the left of target
-                                    entryX = 0;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 1;
-                                } else { // Source below and to the left of target
-                                    entryX = 0;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 0;
-                                }
-                            } else { // Source to the right of target
-                                if (source.y < target.y) { // Source above and to the right of target
-                                    entryX = 0.5;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 1;
-                                } else { // Source below and to the right of target
-                                    entryX = 0.5;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 0;
-                                }
-                            }
-                        }
-                    }catch (error) {
+                        var endpoints = calculateEdgeEndpoints(source, target);
+                        var entryX = endpoints.entryX, entryY = endpoints.entryY, exitX = endpoints.exitX, exitY = endpoints.exitY;
+                    } catch (error) {
                         alert(error);
                     }
                 }
@@ -376,73 +322,76 @@ Draw.loadPlugin(function(ui) {
 			deferredRealizeDependencies.forEach(function(item) {
 				var sourceVertex = graph.getModel().getCell(item.client);
 				var targetVertex = graph.getModel().getCell(item.supplier);
-				if (sourceVertex && targetVertex) {
-					try {
-						var source = sourceVertex.geometry;
+                if (sourceVertex && targetVertex) {
+                    try {
+                        var source = sourceVertex.geometry;
                         var target = targetVertex.geometry;
-                        var entryX, entryY, exitX, exitY;
-        
-                        if (source.x === target.x) { // Source aligned horizontally with target
-                            if (source.y < target.y) { // Source above target
-                                entryX = 0.5;
-                                entryY = 1;
-                                exitX = 0.5;
-                                exitY = 0;
-                            } else { // Source below target
-                                entryX = 0.5;
-                                entryY = 0;
-                                exitX = 0.5;
-                                exitY = 1;
-                            }
-                        } else if (source.y === target.y) { // Source aligned vertically with target
-                            if (source.x < target.x) { // Source to the left of target
-                                entryX = 1;
-                                entryY = 0.5;
-                                exitX = 0;
-                                exitY = 0.5;
-                            } else { // Source to the right of target
-                                entryX = 0;
-                                entryY = 0.5;
-                                exitX = 1;
-                                exitY = 0.5;
-                            }
-                        } else { // Source and target not aligned
-                            if (source.x < target.x) { // Source to the left of target
-                                if (source.y < target.y) { // Source above and to the left of target
-                                    entryX = 0;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 1;
-                                } else { // Source below and to the left of target
-                                    entryX = 0;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 0;
-                                }
-                            } else { // Source to the right of target
-                                if (source.y < target.y) { // Source above and to the right of target
-                                    entryX = 0.5;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 1;
-                                } else { // Source below and to the right of target
-                                    entryX = 0.5;
-                                    entryY = 0.5;
-                                    exitX = 0.5;
-                                    exitY = 0;
-                                }
-                            }
-                        }
-                    }catch (error) {
+                        var endpoints = calculateEdgeEndpoints(source, target);
+                        var entryX = endpoints.entryX, entryY = endpoints.entryY, exitX = endpoints.exitX, exitY = endpoints.exitY;
+                    } catch (error) {
                         alert(error);
                     }
-                    
-					// If source and target vertices exist, create the 'realize' dependency
-					var cell = graph.insertEdge(parent, item.id, item.name, sourceVertex, targetVertex);
-    					
+                    // If source and target vertices exist, create the 'realize' dependency
+                    var cell = graph.insertEdge(parent, item.id, item.name, sourceVertex, targetVertex);
                     // Set edge style and other properties
-					   cell.setStyle('endArrow=classic;html=1;curved=1;edgeStyle=entityRelationEdgeStyle;elbow=vertical;fontSize=' + fontSize + ';exitX=' + exitX + ';exitY=' + exitY + ';entryX=' + entryX + ';entryY=' + entryY + ';entryDx=' + entryDx + ';entryDy=' + entryDy + ';jettySize=auto;orthogonalLoop=1;jumpStyle=none;rounded=0;orthogonal=1;strokeColor=#000000;fillColor=none;');
-					}
+                    cell.setStyle('endArrow=classic;html=1;curved=1;edgeStyle=entityRelationEdgeStyle;elbow=vertical;fontSize=' + fontSize + ';exitX=' + exitX + ';exitY=' + exitY + ';entryX=' + entryX + ';entryY=' + entryY + ';entryDx=' + entryDx + ';entryDy=' + entryDy + ';jettySize=auto;orthogonalLoop=1;jumpStyle=none;rounded=0;orthogonal=1;strokeColor=#000000;fillColor=none;');
+                }
+// Calculates edge entry/exit points based on source and target geometry
+function calculateEdgeEndpoints(source, target) {
+    var entryX, entryY, exitX, exitY;
+    if (source.x === target.x) { // Source aligned horizontally with target
+        if (source.y < target.y) { // Source above target
+            entryX = 0.5;
+            entryY = 1;
+            exitX = 0.5;
+            exitY = 0;
+        } else { // Source below target
+            entryX = 0.5;
+            entryY = 0;
+            exitX = 0.5;
+            exitY = 1;
+        }
+    } else if (source.y === target.y) { // Source aligned vertically with target
+        if (source.x < target.x) { // Source to the left of target
+            entryX = 1;
+            entryY = 0.5;
+            exitX = 0;
+            exitY = 0.5;
+        } else { // Source to the right of target
+            entryX = 0;
+            entryY = 0.5;
+            exitX = 1;
+            exitY = 0.5;
+        }
+    } else { // Source and target not aligned
+        if (source.x < target.x) { // Source to the left of target
+            if (source.y < target.y) { // Source above and to the left of target
+                entryX = 0;
+                entryY = 0.5;
+                exitX = 0.5;
+                exitY = 1;
+            } else { // Source below and to the left of target
+                entryX = 0;
+                entryY = 0.5;
+                exitX = 0.5;
+                exitY = 0;
+            }
+        } else { // Source to the right of target
+            if (source.y < target.y) { // Source above and to the right of target
+                entryX = 0.5;
+                entryY = 0.5;
+                exitX = 0.5;
+                exitY = 1;
+            } else { // Source below and to the right of target
+                entryX = 0.5;
+                entryY = 0.5;
+                exitX = 0.5;
+                exitY = 0;
+            }
+        }
+    }
+    return { entryX, entryY, exitX, exitY };
+}
 			});
 		}
 
