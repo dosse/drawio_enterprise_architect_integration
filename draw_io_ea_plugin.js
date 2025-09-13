@@ -165,7 +165,7 @@ Draw.loadPlugin(function(ui) {
         var xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
         var umlElements = [];
-        var types = ['Class', 'ActionState', 'Actor', 'UseCase', 'Component','Interface','Collaborate', 'Association', 'Dependency'];
+        var types = ['Class', 'ActionState', 'Actor', 'UseCase', 'Component', 'Interface', 'Collaborate', 'Association', 'ProxyConnector', 'Dependency'];
         for (var i in types) {
             umlElements = umlElements.concat(parseUmlElement(xmlDoc, types[i]));
         }
@@ -238,12 +238,12 @@ Draw.loadPlugin(function(ui) {
     // Interprets a tree of umlElements and adds corresponding vertices and edges to mxGraph
     function createMxGraphCells(umlElements, graph, parent) {
         var fontSize = 10;
-		var deferredRealizeDependencies = []; // Store 'realize' dependencies for later processing
+        var deferredRealizeDependencies = []; // Store 'realize' dependencies for later processing
         for (var i = 0; i < umlElements.length; i++) {
             var item = umlElements[i];
             var cell;
 
-            if (item.type == 'Class') {
+            if (item.type == 'Class' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 if (item.stereotype === 'DFD_DataStore') {
                     cell.setStyle('html=1;dashed=0;whiteSpace=wrap;shape=partialRectangle;right=0;left=0;fontSize=' + fontSize);
@@ -266,48 +266,27 @@ Draw.loadPlugin(function(ui) {
 
                     // UML class methods are not yet implemented
                 }
-            } else if (item.type == 'ActionState') {
+            } else if (item.type == 'ActionState' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('shape=ellipse;fontSize=' + fontSize);
-            } else if (item.type == 'Component') {
+            } else if (item.type == 'Component' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('shape=module;align=left;spacingLeft=20;align=center;verticalAlign=top;whiteSpace=wrap;html=1;fontSize=' + fontSize);
-            } else if (item.type == 'Interface') {
+            } else if (item.type == 'Interface' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('ellipse;whiteSpace=wrap;html=1;');
-            } else if (item.type == 'Collaborate') {
+            } else if (item.type == 'Collaborate' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('shape=module;align=left;spacingLeft=20;align=center;verticalAlign=top;whiteSpace=wrap;html=1;fontSize=' + fontSize);
+            } else if (item.type == 'ProxyConnector') {
+                createDependencyOrProxyconnector(item);
             } else if (item.type == 'Dependency') { // directional relationship in a data flow diagram (DFD)
-                var sourceVertex = graph.getModel().getCell(item.client);
-                var targetVertex = graph.getModel().getCell(item.supplier);
-                cell = graph.insertEdge(parent, item.id, item.name, sourceVertex, targetVertex);
-
-                var entryDx = 0;
-                var entryDy = 0;
-                if (item.stereotype == 'realize') {
-                    // Element can not be drawn before Source and Destination
-                    deferredRealizeDependencies.push(item);
-                } else if (item.stereotype == 'optional') {
-                    /*Dependency to resources that are own by other packages than the parent of exported Diagram.*/
-                } else if (item.stereotype == 'mandatory') {
-                    /*Dependency to resources that are own by other packages than the parent of exported Diagram.*/
-                } else {
-                    try {
-                        var source = sourceVertex.geometry;
-                        var target = targetVertex.geometry;
-                        var endpoints = calculateEdgeEndpoints(source, target);
-                        var entryX = endpoints.entryX, entryY = endpoints.entryY, exitX = endpoints.exitX, exitY = endpoints.exitY;
-                    } catch (error) {
-                        alert(error);
-                    }
-                }
-                // Sets edge style to curved edges with control points in this data flow diagram
-                cell.setStyle('endArrow=classic;html=1;curved=1;edgeStyle=entityRelationEdgeStyle;elbow=vertical;fontSize=' + fontSize + ';exitX=' + exitX + ';exitY=' + exitY + ';entryX=' + entryX + ';entryY=' + entryY + ';entryDx=' + entryDx + ';entryDy=' + entryDy + ';jettySize=auto;orthogonalLoop=1;jumpStyle=none;rounded=0;orthogonal=1;strokeColor=#000000;fillColor=none;');
-            } else if (item.type == 'Actor') {
+                // Draw Dependencies after drawing Source and Destination
+                deferredRealizeDependencies.push(item);
+            } else if (item.type == 'Actor' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;');
-            } else if (item.type == 'UseCase') {
+            } else if (item.type == 'UseCase' && typeof item.geometry !== 'undefined') {
                 cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
                 cell.setStyle('ellipse;whiteSpace=wrap;html=1;');
             } else if (item.type == 'Association') {
@@ -317,85 +296,102 @@ Draw.loadPlugin(function(ui) {
                 cell.setStyle('endArrow=none');
             }
         }
-		// Function to process deferred 'realize' dependencies
-		function processDeferredRealizeDependencies() {
-			deferredRealizeDependencies.forEach(function(item) {
-				var sourceVertex = graph.getModel().getCell(item.client);
-				var targetVertex = graph.getModel().getCell(item.supplier);
-                if (sourceVertex && targetVertex) {
-                    try {
-                        var source = sourceVertex.geometry;
-                        var target = targetVertex.geometry;
-                        var endpoints = calculateEdgeEndpoints(source, target);
-                        var entryX = endpoints.entryX, entryY = endpoints.entryY, exitX = endpoints.exitX, exitY = endpoints.exitY;
-                    } catch (error) {
-                        alert(error);
-                    }
-                    // If source and target vertices exist, create the 'realize' dependency
-                    var cell = graph.insertEdge(parent, item.id, item.name, sourceVertex, targetVertex);
-                    // Set edge style and other properties
+        // Function to process deferred dependencies
+        function processDeferredRealizeDependencies() {
+            deferredRealizeDependencies.forEach(function(item) {
+                createDependencyOrProxyconnector(item);
+            });
+        }
+        
+        // Create the dependency or proxyconnector
+        function createDependencyOrProxyconnector(item) {
+            var sourceVertex = graph.getModel().getCell(item.client);
+            var targetVertex = graph.getModel().getCell(item.supplier);
+            // If source and target vertices exist, create the dependency or proxyconnector
+            if (typeof sourceVertex !== 'undefined' || typeof targetVertex !== 'undefined') {
+                var cell = graph.insertEdge(parent, item.id, item.name, sourceVertex, targetVertex);
+                // Find Edge endpoints
+                var entryX, entryY, exitX, exitY;
+                try {
+                    var source = sourceVertex.geometry;
+                    var target = targetVertex.geometry;
+                    var endpoints = calculateEdgeEndpoints(source, target);
+                    entryX = endpoints.entryX; entryY = endpoints.entryY; exitX = endpoints.exitX; exitY = endpoints.exitY;
+                } catch (error) {
+                    alert(error);
+                }
+                // Set edge style and other properties
+                var entryDx = 0;
+                var entryDy = 0;
+                if (item.type == 'Dependency') {
+                    cell.setStyle('dashed=1;endArrow=none;html=1;curved=1;edgeStyle=entityRelationEdgeStyle;elbow=vertical;fontStyle=1;fontSize=' + fontSize + ';exitX=' + exitX + ';exitY=' + exitY + ';entryX=' + entryX + ';entryY=' + entryY + ';entryDx=' + entryDx + ';entryDy=' + entryDy + ';jettySize=auto;orthogonalLoop=1;jumpStyle=none;rounded=0;orthogonal=1;strokeColor=#808080;fillColor=none;');
+                } else if (item.type == 'ProxyConnector') {
                     cell.setStyle('endArrow=classic;html=1;curved=1;edgeStyle=entityRelationEdgeStyle;elbow=vertical;fontSize=' + fontSize + ';exitX=' + exitX + ';exitY=' + exitY + ';entryX=' + entryX + ';entryY=' + entryY + ';entryDx=' + entryDx + ';entryDy=' + entryDy + ';jettySize=auto;orthogonalLoop=1;jumpStyle=none;rounded=0;orthogonal=1;strokeColor=#000000;fillColor=none;');
                 }
-// Calculates edge entry/exit points based on source and target geometry
-function calculateEdgeEndpoints(source, target) {
-    var entryX, entryY, exitX, exitY;
-    if (source.x === target.x) { // Source aligned horizontally with target
-        if (source.y < target.y) { // Source above target
-            entryX = 0.5;
-            entryY = 1;
-            exitX = 0.5;
-            exitY = 0;
-        } else { // Source below target
-            entryX = 0.5;
-            entryY = 0;
-            exitX = 0.5;
-            exitY = 1;
-        }
-    } else if (source.y === target.y) { // Source aligned vertically with target
-        if (source.x < target.x) { // Source to the left of target
-            entryX = 1;
-            entryY = 0.5;
-            exitX = 0;
-            exitY = 0.5;
-        } else { // Source to the right of target
-            entryX = 0;
-            entryY = 0.5;
-            exitX = 1;
-            exitY = 0.5;
-        }
-    } else { // Source and target not aligned
-        if (source.x < target.x) { // Source to the left of target
-            if (source.y < target.y) { // Source above and to the left of target
-                entryX = 0;
-                entryY = 0.5;
-                exitX = 0.5;
-                exitY = 1;
-            } else { // Source below and to the left of target
-                entryX = 0;
-                entryY = 0.5;
-                exitX = 0.5;
-                exitY = 0;
-            }
-        } else { // Source to the right of target
-            if (source.y < target.y) { // Source above and to the right of target
-                entryX = 0.5;
-                entryY = 0.5;
-                exitX = 0.5;
-                exitY = 1;
-            } else { // Source below and to the right of target
-                entryX = 0.5;
-                entryY = 0.5;
-                exitX = 0.5;
-                exitY = 0;
+            } else if (item.type == 'ProxyConnector' && typeof item.geometry !== 'undefined') {
+                var cell = graph.insertVertex(parent, item.id, item.name, item.geometry.x, item.geometry.y, item.geometry.width, item.geometry.height);
+                cell.setStyle('shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;');
             }
         }
-    }
-    return { entryX, entryY, exitX, exitY };
-}
-			});
-		}
+        
+        // Calculates edge entry/exit points based on source and target geometry
+        function calculateEdgeEndpoints(source, target) {
+            var entryX, entryY, exitX, exitY;
+            if (source.x === target.x) { // Source aligned horizontally with target
+                if (source.y < target.y) { // Source above target
+                    entryX = 0.5;
+                    entryY = 1;
+                    exitX = 0.5;
+                    exitY = 0;
+                } else { // Source below target
+                    entryX = 0.5;
+                    entryY = 0;
+                    exitX = 0.5;
+                    exitY = 1;
+                }
+            } else if (source.y === target.y) { // Source aligned vertically with target
+                if (source.x < target.x) { // Source to the left of target
+                    entryX = 1;
+                    entryY = 0.5;
+                    exitX = 0;
+                    exitY = 0.5;
+                } else { // Source to the right of target
+                    entryX = 0;
+                    entryY = 0.5;
+                    exitX = 1;
+                    exitY = 0.5;
+                }
+            } else { // Source and target not aligned
+                if (source.x < target.x) { // Source to the left of target
+                    if (source.y < target.y) { // Source above and to the left of target
+                        entryX = 0;
+                        entryY = 0.5;
+                        exitX = 0.5;
+                        exitY = 1;
+                    } else { // Source below and to the left of target
+                        entryX = 0;
+                        entryY = 0.5;
+                        exitX = 0.5;
+                        exitY = 0;
+                    }
+                } else { // Source to the right of target
+                    if (source.y < target.y) { // Source above and to the right of target
+                        entryX = 0.5;
+                        entryY = 0.5;
+                        exitX = 0.5;
+                        exitY = 1;
+                    } else { // Source below and to the right of target
+                        entryX = 0.5;
+                        entryY = 0.5;
+                        exitX = 0.5;
+                        exitY = 0;
+                    }
+                }
+            }
+            return { entryX, entryY, exitX, exitY };
+        }
 
-		// Process deferred 'realize' dependencies after all elements are imported
-		processDeferredRealizeDependencies();
+        // Process deferred 'realize' dependencies after all elements are imported
+        processDeferredRealizeDependencies();
     }
 });
